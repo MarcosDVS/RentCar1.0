@@ -1,0 +1,204 @@
+﻿@page "/vehiculos"
+
+<MenuDisplay />
+
+@if (!ShowForm)
+{
+    <h3>Vehiculos (@Vehicles.Count)</h3>
+    <div class="mb-2">
+        <button class="btn btn-success"
+            @onclick="()=>{ShowForm = !ShowForm;}">
+            Agregar
+        </button>
+    </div>
+}
+<div class="container">
+    @if (ShowForm) 
+    {
+        <h3>@TituloForm</h3>
+        <EditForm Model="request" OnValidSubmit="Send">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Marca</label>
+                <InputText class="form-control" @bind-Value="@request.Make"></InputText>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Modelo</label>
+                <InputText class="form-control" @bind-Value="@request.Model"></InputText>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Placa</label>
+                <InputText class="form-control" @bind-Value="@request.PlateNumber"></InputText>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Año</label>
+                <InputNumber class="form-control" @bind-Value="@request.Year"></InputNumber>
+            </div>
+            
+            <div class="btn-group">
+                <button type="submit" class="btn btn-outline-success">Guardar</button>
+                <button @onclick="Cancelar" class="btn btn-outline-danger">Cancelar</button>
+            </div>
+        </EditForm>
+        <br />
+    }
+    else
+    {
+        @foreach (var vehicle in Vehicles)
+        {
+            <div class="card" style="width:18rem;">
+                <div class="card-body">
+                    <label class="card-title">@vehicle.Make</label>
+                    <div class="card-text">
+                        <label><b>Modelo:</b> @vehicle.Model</label>
+                    </div>
+                    <button @onclick="()=>MostrarDetalles(vehicle.Id)" class="btn btn-info">
+                        Detalles
+                    </button>
+                    <button @onclick="()=>Seleccionar(vehicle.Id)"
+                    class="btn btn-warning">
+                        Editar
+                    </button>
+                    <button @onclick="()=>Eliminar(vehicle)"
+                    class="btn btn-danger">
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        }
+    }
+    @if (ShowDetails)
+    {
+        <h3>Detalles del Vehiculo</h3>
+        @if (SelectedVehicle != null)
+        {
+            <div class="card" style="width: 18rem;">
+                <div class="card-body">
+                    <h5 class="card-title">@SelectedVehicle.Make</h5>
+                    <p class="card-text">
+                        <b>Modelo:</b> @SelectedVehicle.Model
+                    </p>
+                    <p>
+                        <b>Placa:</b> @SelectedVehicle.PlateNumber
+                    </p>
+                    <p>
+                        <b>Año:</b> @SelectedVehicle.Year
+                    </p>
+                    <button @onclick="()=>Editar(SelectedVehicle)" class="btn btn-warning">
+                        Editar
+                    </button>
+                    <button @onclick="Close" class="btn btn-danger">
+                        Close
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p>No se ha seleccionado ningún empleado.</p>
+        }
+    }
+</div>
+@code {
+    public string TituloForm => request.Id == 0 ?
+    "Agregar vehiculo" : "Modificar vehiculo";
+
+    public bool ShowForm { get; set; } = false;
+    public bool ShowDetails { get; set; } = false;
+    public string Filtro { get; set; } = "";
+    public List<VehicleResponse> Vehicles { get; set; }
+        = new List<VehicleResponse>();
+    public VehicleResponse SelectedVehicle { get; set; }
+
+    public VehicleRequest request { get; set; } = new VehicleRequest();
+
+    void Cancelar()
+    {
+        request = new VehicleRequest();
+        ShowForm = false;
+    }
+    async Task CargarVehiculos()
+    {
+        var resultado =
+        await vehicleServices.Consultar(Filtro);
+        if (resultado.Success)
+        {
+            Vehicles = resultado.Data!;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarVehiculos();
+    }
+
+    public async Task Send()
+    {
+        if (request.Id == 0)
+        {
+            //Debo registrar el contacto..
+            var r = await vehicleServices.Crear(request);
+            if (r.Success)
+            {
+                Cancelar();
+                await CargarVehiculos();
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            //Debo solicitar modificar el contacto...
+            var r = await vehicleServices.Modificar(request);
+            if (r.Success)
+            {
+                Cancelar();
+                await CargarVehiculos();
+                StateHasChanged();
+            }
+        }
+    }
+
+    public void Seleccionar(int Id)
+    {
+        ShowForm = true;
+        request = Vehicles
+        .Where(c => c.Id == Id)
+        .Select(c => c.ToRequest())
+        .FirstOrDefault() ?? new VehicleRequest();
+    }
+
+    public async Task Eliminar(VehicleResponse vehicle)
+    {
+        var resultado = await vehicleServices.Eliminar(vehicle.ToRequest());
+        if (resultado.Success)
+        {
+            await CargarVehiculos();
+            StateHasChanged();
+        }
+    }
+
+    void Close()
+    {
+        ShowDetails = false;
+    }
+    public async Task MostrarDetalles(int vehicleId)
+    {
+        ShowForm = false;
+        ShowDetails = true;
+        SelectedVehicle = Vehicles.FirstOrDefault(v => v.Id == vehicleId);
+    }
+    public void Editar(VehicleResponse vehicle)
+    {
+        ShowForm = true;
+        ShowDetails = false;
+        request = new VehicleRequest
+            {
+                Id = vehicle.Id,
+                Make = vehicle.Make,
+                Model = vehicle.Model,
+                PlateNumber = vehicle.PlateNumber,
+                Year = vehicle.Year,
+            };
+    }
+}

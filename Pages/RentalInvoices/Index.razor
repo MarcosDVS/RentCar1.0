@@ -1,0 +1,219 @@
+﻿@page "/rentalInvoices"
+
+<MenuDisplay />
+
+@if (!ShowForm)
+{
+    <h3>Vehiculos Rentados (@Invoices.Count)</h3>
+    <div class="mb-2">
+        <button class="btn btn-success"
+            @onclick="()=>{ShowForm = !ShowForm;}">
+            Agregar
+        </button>
+    </div>
+}
+<div class="container">
+    @if (ShowForm)
+    {
+        <h3>@TituloForm</h3>
+        <EditForm Model="request" OnValidSubmit="Send">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="mb-3 input-group">
+                <input 
+               class="form-control"
+               placeholder="Cliente"
+               aria-label="Cliente"
+               aria-describedby="button-addon2" list="contactos"
+               @bind="Nombre"
+               />
+                <datalist id="contactos">
+                @foreach (var cliente in Customers)
+                    {
+                        <option value="@cliente.Name" @onclick="()=>BuscarSeleccionarCliente(cliente.Name)" />
+                    }
+                </datalist>
+            </div>
+            <div class="mb-3 input-group">
+                <input class="form-control"
+                   placeholder="Vehiculo"
+                   aria-label="Vehiculo"
+                   aria-describedby="button-addon2" list="vehicles"
+                   @onchange="(value)=>{
+                    var r = Vehicles.FirstOrDefault(p=>p.CodigoDescripcion == value.Value!.ToString());
+                    }"
+                   />
+                <datalist id="vehicles">
+                    @foreach (var vehiculo in Vehicles)
+                    {
+                        <option value="@vehiculo.CodigoDescripcion" />
+                    }
+                </datalist>
+            </div>
+            
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Fecha De Renta</label>
+                <InputDate class="form-control" @bind-Value="@request.RentalDate"></InputDate>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Fecha De Devolución</label>
+                <InputDate class="form-control" @bind-Value="@request.ReturnDate"></InputDate>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Precio por Día</label>
+                <InputNumber class="form-control" @bind-Value="@request.PriceDay"></InputNumber>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Total a Pagar</label>
+                <InputNumber class="form-control" @bind-Value="@request.TotalAmount"></InputNumber>
+            </div>
+
+            <div class="btn-group">
+                <button type="submit" class="btn btn-outline-success">Guardar</button>
+                <button type="button" class="btn btn-outline-primary" @onclick="CalculateTotalAmount"> Calcular</button>
+                <button @onclick="Cancelar" class="btn btn-outline-danger">Cancelar</button>
+            </div>
+        </EditForm>
+        <br />
+    }
+    else
+    {
+        @foreach (var invoice in Invoices)
+        {
+            <div class="card" style="width:18rem;">
+                <div class="card-body">
+                    <label class="card-title">@invoice.NombreCustomerTexto</label>
+                    <div class="card-text">
+                        <label><b>Vehiculo:</b> @invoice.NombreVehicleTexto</label>
+                        <label><b>Rentado:</b> @invoice.RentalDate</label>
+                        <label><b>Devolver:</b> @invoice.ReturnDate</label>
+                    </div>
+                    <button @onclick="()=>Seleccionar(invoice.Id)"
+                    class="btn btn-warning">
+                        Editar
+                    </button>
+                    <button @onclick="()=>Eliminar(invoice)"
+                    class="btn btn-danger">
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        }
+    }
+</div>
+@code {
+    public string TituloForm => request.Id == 0 ?
+    "Agregar Vehiculo Rentado" : "Modificar Vehiculo Rentado";
+
+    public string Nombre { get; set; } = string.Empty;
+    public bool ShowForm { get; set; } = false;
+    public string Filtro { get; set; } = "";
+    public List<RentalInvoiceResponse> Invoices { get; set; }
+        = new List<RentalInvoiceResponse>();
+    public List<CustomerResponse> Customers { get; set; } = new List<CustomerResponse>();
+    public List<VehicleResponse> Vehicles { get; set; } = new List<VehicleResponse>();
+
+    public RentalInvoiceRequest request { get; set; } = new RentalInvoiceRequest();
+
+    void BuscarSeleccionarCliente(string Customer)
+    {
+        var c = Customers.FirstOrDefault(p => p.Name == Customer)!;
+        if (c != null) request.CustomerId = c.Id;
+    }
+
+    void CalculateTotalAmount()
+    {
+        DateTime startDate = request.RentalDate;
+        DateTime endDate = request.ReturnDate;
+        int totalDays = (int)(endDate - startDate).TotalDays;
+        decimal totalAmount = totalDays * request.PriceDay;
+
+        request.TotalAmount = totalAmount;
+    }
+
+
+    void Cancelar()
+    {
+        request = new RentalInvoiceRequest();
+        ShowForm = false;
+    }
+    async Task CargarVehiculos()
+    {
+        var resultado =
+        await vehicleServices.Consultar(Filtro);
+        if (resultado.Success)
+        {
+            Vehicles = resultado.Data!;
+        }
+    }
+    async Task CargarClientes()
+    {
+        var resultado =
+        await customerServices.Consultar(Filtro);
+        if (resultado.Success)
+        {
+            Customers = resultado.Data!;
+        }
+    }
+    async Task CargarFacturas()
+    {
+        var resultado =
+        await rentalInvoiceServices.Consultar(Filtro);
+        if (resultado.Success)
+        {
+            Invoices = resultado.Data!;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarVehiculos();
+        await CargarClientes();
+        await CargarFacturas();
+    }
+
+    public async Task Send()
+    {
+        if (request.Id == 0)
+        {
+            //Debo registrar el contacto..
+            var r = await rentalInvoiceServices.Crear(request);
+            if (r.Success)
+            {
+                Cancelar();
+                await CargarFacturas();
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            //Debo solicitar modificar el contacto...
+            var r = await rentalInvoiceServices.Modificar(request);
+            if (r.Success)
+            {
+                Cancelar();
+                await CargarFacturas();
+                StateHasChanged();
+            }
+        }
+    }
+
+    public void Seleccionar(int Id)
+    {
+        ShowForm = true;
+        request = Invoices
+        .Where(c => c.Id == Id)
+        .Select(c => c.ToRequest())
+        .FirstOrDefault() ?? new RentalInvoiceRequest();
+    }
+
+    public async Task Eliminar(RentalInvoiceResponse invoice)
+    {
+        var resultado = await rentalInvoiceServices.Eliminar(invoice.ToRequest());
+        if (resultado.Success)
+        {
+            await CargarFacturas();
+            StateHasChanged();
+        }
+    }
+}

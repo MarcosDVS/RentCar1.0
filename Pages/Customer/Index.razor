@@ -1,0 +1,201 @@
+﻿@page "/customer"
+@inject ICustomerServices customerService
+
+<MenuDisplay />
+
+@if (!ShowForm) 
+{
+    <h3>Customer(@Customers.Count)</h3>
+    <div class="mb-2">
+        <button class="btn btn-success" @onclick="MostrarFormulario">
+            Agregar
+        </button>
+    </div>
+}
+<div class="container">
+    @if (ShowForm)
+    {
+        <h3>@TituloForm</h3>
+        <EditForm Model="request" OnValidSubmit="Send">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Nombre</label>
+                <InputText class="form-control" @bind-Value="@request.Name"></InputText>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Teléfono</label>
+                <InputText class="form-control" @bind-Value="@request.PhoneNumber"></InputText>
+            </div>
+            <div class="mb-3 input-group">
+                <label class="input-group-text">Correo electrónico</label>
+                <InputText class="form-control" @bind-Value="@request.Email"></InputText>
+            </div>
+
+            <div class="btn-group">
+                <button type="submit" class="btn btn-outline-success">Guardar</button>
+                <button @onclick="Cancelar" class="btn btn-outline-danger">Cancelar</button>
+            </div>
+        </EditForm>
+        <br />
+    }
+    else
+    {
+        @foreach (var customer in Customers)
+        {
+            <div class="card" style="width:18rem;">
+                <div class="card-body">
+                    <label class="card-title">@customer.Name</label>
+                    <div class="card-text">
+                        <label><b>Teléfono:</b> @customer.PhoneNumber</label>
+                    </div>
+                    <button @onclick="()=>MostrarDetalles(customer.Id)" class="btn btn-info">
+                        Detalles
+                    </button>
+                    <button @onclick="()=>Editar(customer)" class="btn btn-warning">
+                        Editar
+                    </button>
+                    <button @onclick="()=>Eliminar(customer)" class="btn btn-danger">
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        }
+    }
+    @if (ShowDetails)
+    {
+        <h3>Detalles del Cliente</h3>
+        @if (SelectedCustomer != null)
+        {
+            <div class="card" style="width:18rem;">
+                <div class="card-body">
+                    <h5 class="card-title">@SelectedCustomer.Name</h5>
+                    <p class="card-text">
+                        <b>Teléfono:</b> @SelectedCustomer.PhoneNumber
+                    </p>
+                    <p class="card-text">
+                        <b>Correo electrónico:</b> @SelectedCustomer.Email
+                    </p>
+                    <button @onclick="()=>Editar(SelectedCustomer)" class="btn btn-warning">
+                        Editar
+                    </button>
+                    <button @onclick="Close" class="btn btn-danger">
+                        Close
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p>No se ha seleccionado ningún cliente.</p>
+        }
+    }
+</div>
+
+@code {
+    public string TituloForm => request.Id == 0 ? "Agregar cliente" : "Modificar cliente";
+
+    public bool ShowForm { get; set; } = false;
+    public bool ShowDetails { get; set; } = false;
+    public string Filtro { get; set; } = "";
+    public List<CustomerResponse> Customers { get; set; } = new List<CustomerResponse>();
+    public CustomerResponse SelectedCustomer { get; set; }
+
+    public CustomerRequest request = new CustomerRequest();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCustomers();
+    }
+
+    public async Task CargarCustomers()
+    {
+        var resultado = await customerService.Consultar(Filtro);
+        if (resultado.Success)
+        {
+            Customers = resultado.Data;
+        }
+        else
+        {
+            // Mostrar mensaje de error
+        }
+    }
+
+    public async Task Send()
+    {
+        if (request.Id == 0)
+        {
+            var resultado = await customerService.Crear(request);
+            if (resultado.Success)
+            {
+                Cancelar();
+                await CargarCustomers();
+            }
+            else
+            {
+                // Mostrar mensaje de error
+            }
+        }
+        else
+        {
+            var resultado = await customerService.Modificar(request);
+            if (resultado.Success)
+            {
+                Cancelar();
+                await CargarCustomers();
+            }
+            else
+            {
+                // Mostrar mensaje de error
+            }
+        }
+    }
+
+    public async Task Eliminar(CustomerResponse customer)
+    {
+        var resultado = await customerService.Eliminar(customer.ToRequest());
+        if (resultado.Success)
+        {
+            await CargarCustomers();
+        }
+        else
+        {
+            // Mostrar mensaje de error
+        }
+    }
+
+    void MostrarFormulario()
+    {
+        request = new CustomerRequest();
+        ShowForm = true;
+    }
+
+    void Cancelar()
+    {
+        ShowForm = false;
+        ShowDetails = false;
+    }
+
+    void Close()
+    {
+        ShowDetails = false;
+    }
+    void MostrarDetalles(int customerId)
+    {
+        SelectedCustomer = Customers.FirstOrDefault(c => c.Id == customerId);
+        ShowDetails = true;
+    }
+
+    void Editar(CustomerResponse customer)
+    {
+        request = new CustomerRequest
+            {
+                Id = customer.Id,
+                Name = customer.Name,
+                PhoneNumber = customer.PhoneNumber,
+                Email = customer.Email
+            };
+        ShowForm = true;
+    }
+}
+ 
