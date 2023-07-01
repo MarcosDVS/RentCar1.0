@@ -21,14 +21,14 @@ namespace RentCar.Data.Models
         public decimal PriceDay { get; set; } = 1500;
         public decimal TotalAmount { get; set; } = 3000;
 
-        public static RentalInvoice Crear(RentalInvoiceRequest rentalInvoice) => new RentalInvoice()
+        public static RentalInvoice Crear(RentalInvoiceRequest invoice) => new RentalInvoice()
         {
-            CustomerId = rentalInvoice.CustomerId,
-            VehicleId = rentalInvoice.VehicleId,
-            RentalDate = rentalInvoice.RentalDate,
-            ReturnDate = rentalInvoice.ReturnDate,
-            PriceDay = rentalInvoice.PriceDay,
-            TotalAmount = rentalInvoice.TotalAmount
+            CustomerId = invoice.CustomerId,
+            VehicleId = invoice.VehicleId,
+            RentalDate = invoice.RentalDate,
+            ReturnDate = invoice.ReturnDate,
+            PriceDay = invoice.PriceDay,
+            TotalAmount = invoice.TotalAmount
         };
         public bool Modificar(RentalInvoiceRequest rentalInvoice)
         {

@@ -34,12 +34,12 @@ namespace RentCar.Data.Services
         {
             try
             {
-                var vehicle = await dbContext.Invoices
+                var invoice = await dbContext.Invoices
                     .FirstOrDefaultAsync(r => r.Id == request.Id);
-                if (vehicle == null)
+                if (invoice == null)
                     return new Result() { Message = "No se encontro la factura de renta", Success = false };
 
-                if (vehicle.Modificar(request))
+                if (invoice.Modificar(request))
                     await dbContext.SaveChangesAsync();
 
                 return new Result() { Message = "Ok", Success = true };
